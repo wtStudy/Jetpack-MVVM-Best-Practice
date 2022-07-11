@@ -40,6 +40,8 @@ public class App extends BaseApplication {
 
         Utils.init(this);
         PlayerManager.getInstance().init(this);
+
+
     }
 
 }
