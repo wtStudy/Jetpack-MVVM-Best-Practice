@@ -22,8 +22,7 @@ import androidx.lifecycle.LifecycleOwner;
 
 import com.kunminx.architecture.data.response.DataResult;
 import com.kunminx.architecture.domain.usecase.UseCase;
-import com.kunminx.puremusic.data.bean.DownloadFile;
-import com.kunminx.puremusic.data.repository.DataRepository;
+import com.kunminx.puremusic.data.bean.DownloadState;
 
 
 /**
@@ -31,26 +30,38 @@ import com.kunminx.puremusic.data.repository.DataRepository;
  * <p>
  * TODO tip：
  * 同样是“下载”，我不是在数据层分别写两个方法，
- * 而是遵循开闭原则，在 vm 和 数据层之间，插入一个 UseCase，来专门负责可叫停的情况，
+ * 而是遵循开闭原则，在 ViewModel 和 数据层之间，插入一个 UseCase，来专门负责可叫停的情况，
  * 除了开闭原则，使用 UseCase 还有个考虑就是避免内存泄漏，
  * 具体缘由可详见 https://xiaozhuanlan.com/topic/6257931840 评论区 15 楼
  * 以及《如何让同事爱上架构模式、少写 bug 多注释》的解析
  * https://xiaozhuanlan.com/topic/8204519736
  * <p>
+ *
+ * 现已更换为在 MVI-Dispatcher 中处理，具体可参见 DownloadRequest 实现
+ *
+ *
  * Create by KunMinX at 19/11/25
  */
+@Deprecated
 public class CanBeStoppedUseCase extends UseCase<CanBeStoppedUseCase.RequestValues,
-        CanBeStoppedUseCase.ResponseValue> implements DefaultLifecycleObserver {
+    CanBeStoppedUseCase.ResponseValue> implements DefaultLifecycleObserver {
 
-    private DownloadFile mDownloadFile = new DownloadFile();
+//    private final DownloadState downloadState = new DownloadState();
+
+    //TODO tip：让 CanBeStoppedUseCase 可观察页面生命周期，
+    // 从而在页面即将退出、且下载请求尚未完成时，
+    // 及时通知数据层取消本次请求，以避免资源浪费和一系列不可预期的问题。
+
+    // 关于 Lifecycle 组件的存在意义，可详见《为你还原一个真实的 Jetpack Lifecycle》篇的解析
+    // https://xiaozhuanlan.com/topic/3684721950
 
     @Override
     public void onStop(@NonNull LifecycleOwner owner) {
         if (getRequestValues() != null) {
-            mDownloadFile.setForgive(true);
-            mDownloadFile.setProgress(0);
-            mDownloadFile.setFile(null);
-            getUseCaseCallback().onError();
+//            downloadState.isForgive = true;
+//            downloadState.file = null;
+//            downloadState.progress = 0;
+//            getUseCaseCallback().onError();
         }
     }
 
@@ -59,9 +70,9 @@ public class CanBeStoppedUseCase extends UseCase<CanBeStoppedUseCase.RequestValu
 
         //访问数据层资源，在 UseCase 中处理带叫停性质的业务
 
-        DataRepository.getInstance().downloadFile(mDownloadFile, dataResult -> {
-            getUseCaseCallback().onSuccess(new ResponseValue(dataResult));
-        });
+//        DataRepository.getInstance().downloadFile(downloadState, dataResult -> {
+//            getUseCaseCallback().onSuccess(new ResponseValue(dataResult));
+//        });
     }
 
     public static final class RequestValues implements UseCase.RequestValues {
@@ -70,13 +81,13 @@ public class CanBeStoppedUseCase extends UseCase<CanBeStoppedUseCase.RequestValu
 
     public static final class ResponseValue implements UseCase.ResponseValue {
 
-        private DataResult<DownloadFile> mDataResult;
+        private final DataResult<DownloadState> mDataResult;
 
-        public ResponseValue(DataResult<DownloadFile> dataResult) {
+        public ResponseValue(DataResult<DownloadState> dataResult) {
             mDataResult = dataResult;
         }
 
-        public DataResult<DownloadFile> getDataResult() {
+        public DataResult<DownloadState> getDataResult() {
             return mDataResult;
         }
     }

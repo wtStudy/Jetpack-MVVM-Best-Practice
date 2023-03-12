@@ -19,18 +19,16 @@ package com.kunminx.puremusic.ui.view;
 import android.animation.ArgbEvaluator;
 import android.animation.FloatEvaluator;
 import android.animation.IntEvaluator;
-import android.content.Context;
 import android.graphics.Color;
 import android.graphics.Rect;
+import android.util.Pair;
 import android.view.View;
-import android.view.animation.Animation;
-import android.view.animation.AnimationUtils;
+import android.widget.TextView;
 
-import androidx.coordinatorlayout.widget.CoordinatorLayout;
-
+import com.kunminx.architecture.ui.page.StateHolder;
+import com.kunminx.architecture.ui.state.State;
 import com.kunminx.architecture.utils.DisplayUtils;
 import com.kunminx.architecture.utils.ScreenUtils;
-import com.kunminx.puremusic.R;
 import com.kunminx.puremusic.databinding.FragmentPlayerBinding;
 import com.sothree.slidinguppanel.SlidingUpPanelLayout;
 
@@ -41,197 +39,165 @@ public class PlayerSlideListener implements SlidingUpPanelLayout.PanelSlideListe
 
     private final FragmentPlayerBinding mBinding;
     private final SlidingUpPanelLayout mSlidingUpPanelLayout;
+    private final SlideAnimatorStates mStates;
 
-    private int titleEndTranslationX;
-    private int artistEndTranslationX;
-    private int artistNormalEndTranslationY;
-    private int contentNormalEndTranslationY;
+    private int mTitleEndTranslationX;
+    private int mArtistEndTranslationX;
+    private int mArtistNormalEndTranslationY;
+    private int mContentNormalEndTranslationY;
 
-    private int modeStartX;
-    private int previousStartX;
-    private int playPauseStartX;
-    private int nextStartX;
-    private int playQueueStartX;
-    private int playPauseEndX;
-    private int previousEndX;
-    private int modeEndX;
-    private int nextEndX;
-    private int playQueueEndX;
-    private int iconContainerStartY;
-    private int iconContainerEndY;
+    private final int mModeStartX;
+    private final int mPreviousStartX;
+    private final int mPlayPauseStartX;
+    private final int mNextStartX;
+    private final int mPlayQueueStartX;
+    private final int mPlayPauseEndX;
+    private final int mPreviousEndX;
+    private final int mModeEndX;
+    private final int mNextEndX;
+    private final int mPlayQueueEndX;
+    private final int mIconContainerStartY;
+    private final int mIconContainerEndY;
 
-    private final int screenWidth;
-    private final int screenHeight;
+    private final int SCREEN_WIDTH;
+    private final int SCREEN_HEIGHT;
 
-    private final IntEvaluator intEvaluator = new IntEvaluator();
-    private final FloatEvaluator floatEvaluator = new FloatEvaluator();
-    private final ArgbEvaluator colorEvaluator = new ArgbEvaluator();
+    private final IntEvaluator INT_EVALUATOR = new IntEvaluator();
+    private final FloatEvaluator FLOAT_EVALUATOR = new FloatEvaluator();
+    private final ArgbEvaluator COLOR_EVALUATOR = new ArgbEvaluator();
 
-    private final int nowPlayingCardColor;
-    private final int playPauseDrawableColor;
+    private final int NOW_PLAYING_CARD_COLOR;
+    private final int PLAY_PAUSE_DRAWABLE_COLOR;
     private Status mStatus = Status.COLLAPSED;
 
     public enum Status {
         EXPANDED,
         COLLAPSED,
-        FULLSCREEN
     }
 
-    public PlayerSlideListener(FragmentPlayerBinding binding, SlidingUpPanelLayout slidingUpPanelLayout) {
+    public PlayerSlideListener(FragmentPlayerBinding binding, SlideAnimatorStates states, SlidingUpPanelLayout slidingUpPanelLayout) {
         mBinding = binding;
+        mStates = states;
         mSlidingUpPanelLayout = slidingUpPanelLayout;
-        screenWidth = ScreenUtils.getScreenWidth();
-        screenHeight = ScreenUtils.getScreenHeight();
-        playPauseDrawableColor = Color.BLACK;
-        nowPlayingCardColor = Color.WHITE;
+        SCREEN_WIDTH = ScreenUtils.getScreenWidth();
+        SCREEN_HEIGHT = ScreenUtils.getScreenHeight();
+        PLAY_PAUSE_DRAWABLE_COLOR = Color.BLACK;
+        NOW_PLAYING_CARD_COLOR = Color.WHITE;
         calculateTitleAndArtist();
-        calculateIcons();
-        mBinding.playPause.setDrawableColor(playPauseDrawableColor);
+        mModeStartX = binding.mode != null ? binding.mode.getLeft() : 0;
+        mPreviousStartX = binding.previous.getLeft();
+        mPlayPauseStartX = binding.playPause.getLeft();
+        mNextStartX = binding.next.getLeft();
+        mPlayQueueStartX = binding.icPlayList != null ? binding.icPlayList.getLeft() : 0;
+        int size = DisplayUtils.dp2px(36);
+        int gap = (SCREEN_WIDTH - 5 * (size)) / 6;
+        mPlayPauseEndX = (SCREEN_WIDTH / 2) - (size / 2);
+        mPreviousEndX = mPlayPauseEndX - gap - size;
+        mModeEndX = mPreviousEndX - gap - size;
+        mNextEndX = mPlayPauseEndX + gap + size;
+        mPlayQueueEndX = mNextEndX + gap + size;
+        mIconContainerStartY = binding.iconContainer.getTop();
+        int tempImgSize = DisplayUtils.dp2px(55);
+        mStates.albumArtSize.set(new Pair<>(tempImgSize, tempImgSize));
+        mIconContainerEndY = SCREEN_HEIGHT - 3 * binding.iconContainer.getHeight() - binding.seekBottom.getHeight();
+        mStates.playPauseDrawableColor.set(PLAY_PAUSE_DRAWABLE_COLOR);
+        mStates.playCircleAlpha.set(INT_EVALUATOR.evaluate(0, 0, 255));
+        mStates.nextX.set(mNextStartX);
+    mStates.modeX.set(0);
+    mStates.previousX.set(0);
+        mStates.playPauseX.set(mPlayPauseStartX);
+        mStates.iconContainerY.set(mIconContainerStartY);
+        mBinding.executePendingBindings();
     }
 
     @Override
     public void onPanelSlide(View panel, float slideOffset) {
-        CoordinatorLayout.LayoutParams params = (CoordinatorLayout.LayoutParams) mBinding.albumArt.getLayoutParams();
-
-        //animate albumImage
-        int tempImgSize = intEvaluator.evaluate(slideOffset, DisplayUtils.dp2px(55), screenWidth);
-        params.width = tempImgSize;
-        params.height = tempImgSize;
-        mBinding.albumArt.setLayoutParams(params);
-
-        //animate title and artist
-        mBinding.title.setTranslationX(floatEvaluator.evaluate(slideOffset, 0, titleEndTranslationX));
-        mBinding.artist.setTranslationX(floatEvaluator.evaluate(slideOffset, 0, artistEndTranslationX));
-        mBinding.artist.setTranslationY(floatEvaluator.evaluate(slideOffset, 0, artistNormalEndTranslationY));
-        mBinding.summary.setTranslationY(floatEvaluator.evaluate(slideOffset, 0, contentNormalEndTranslationY));
-
-        //aniamte icons
-        mBinding.playPause.setX(intEvaluator.evaluate(slideOffset, playPauseStartX, playPauseEndX));
-        mBinding.playPause.setCircleAlpha(intEvaluator.evaluate(slideOffset, 0, 255));
-        mBinding.playPause.setDrawableColor((int) colorEvaluator.evaluate(slideOffset, playPauseDrawableColor, nowPlayingCardColor));
-        mBinding.previous.setX(intEvaluator.evaluate(slideOffset, previousStartX, previousEndX));
-        mBinding.mode.setX(intEvaluator.evaluate(slideOffset, modeStartX, modeEndX));
-        mBinding.next.setX(intEvaluator.evaluate(slideOffset, nextStartX, nextEndX));
-        mBinding.icPlayList.setX(intEvaluator.evaluate(slideOffset, playQueueStartX, playQueueEndX));
-        mBinding.mode.setAlpha(floatEvaluator.evaluate(slideOffset, 0, 1));
-        mBinding.previous.setAlpha(floatEvaluator.evaluate(slideOffset, 0, 1));
-        mBinding.iconContainer.setY(intEvaluator.evaluate(slideOffset, iconContainerStartY, iconContainerEndY));
-
-        CoordinatorLayout.LayoutParams params1 = (CoordinatorLayout.LayoutParams) mBinding.summary.getLayoutParams();
-        params1.height = intEvaluator.evaluate(slideOffset, DisplayUtils.dp2px(55), DisplayUtils.dp2px(60));
-        mBinding.summary.setLayoutParams(params1);
-
+        calculateTitleAndArtist();
+        int tempImgSize = INT_EVALUATOR.evaluate(slideOffset, DisplayUtils.dp2px(55), SCREEN_WIDTH);
+        mStates.albumArtSize.set(new Pair<>(tempImgSize, tempImgSize));
+        mStates.titleTranslationX.set(FLOAT_EVALUATOR.evaluate(slideOffset, 0, mTitleEndTranslationX));
+        mStates.artistTranslationX.set(FLOAT_EVALUATOR.evaluate(slideOffset, 0, mArtistEndTranslationX));
+        mStates.artistTranslationY.set(FLOAT_EVALUATOR.evaluate(slideOffset, 0, mArtistNormalEndTranslationY));
+        mStates.summaryTranslationY.set(FLOAT_EVALUATOR.evaluate(slideOffset, 0, mContentNormalEndTranslationY));
+        mStates.playPauseX.set(INT_EVALUATOR.evaluate(slideOffset, mPlayPauseStartX, mPlayPauseEndX));
+        mStates.playCircleAlpha.set(INT_EVALUATOR.evaluate(slideOffset, 0, 255));
+        mStates.playPauseDrawableColor.set((int) COLOR_EVALUATOR.evaluate(slideOffset, PLAY_PAUSE_DRAWABLE_COLOR, NOW_PLAYING_CARD_COLOR));
+        mStates.previousX.set(INT_EVALUATOR.evaluate(slideOffset, mPreviousStartX, mPreviousEndX));
+        mStates.modeX.set(INT_EVALUATOR.evaluate(slideOffset, mModeStartX, mModeEndX));
+        mStates.nextX.set(INT_EVALUATOR.evaluate(slideOffset, mNextStartX, mNextEndX));
+        mStates.icPlayListX.set(INT_EVALUATOR.evaluate(slideOffset, mPlayQueueStartX, mPlayQueueEndX));
+        mStates.modeAlpha.set(FLOAT_EVALUATOR.evaluate(slideOffset, 0, 1));
+        mStates.previousAlpha.set(FLOAT_EVALUATOR.evaluate(slideOffset, 0, 1));
+        mStates.iconContainerY.set(INT_EVALUATOR.evaluate(slideOffset, mIconContainerStartY, mIconContainerEndY));
+        mBinding.executePendingBindings();
     }
 
     @Override
-    public void onPanelStateChanged(View panel, SlidingUpPanelLayout.PanelState previousState,
-                                    SlidingUpPanelLayout.PanelState newState) {
+    public void onPanelStateChanged(View panel, SlidingUpPanelLayout.PanelState previousState, SlidingUpPanelLayout.PanelState newState) {
         if (previousState == SlidingUpPanelLayout.PanelState.COLLAPSED) {
-            if (mBinding.songProgressNormal.getVisibility() != View.INVISIBLE) {
-                mBinding.songProgressNormal.setVisibility(View.INVISIBLE);
-            }
-            if (mBinding.mode.getVisibility() != View.VISIBLE) {
-                mBinding.mode.setVisibility(View.VISIBLE);
-            }
-            if (mBinding.previous.getVisibility() != View.VISIBLE) {
-                mBinding.previous.setVisibility(View.VISIBLE);
-            }
+            mStates.songProgressNormalVisibility.set(false);
+            mStates.modeVisibility.set(true);
+            mStates.previousVisibility.set(true);
         }
-
         if (newState == SlidingUpPanelLayout.PanelState.EXPANDED) {
             mStatus = Status.EXPANDED;
-            toolbarSlideIn(panel.getContext());
-            mBinding.mode.setClickable(true);
-            mBinding.previous.setClickable(true);
+            mStates.customToolbarVisibility.set(true);
         } else if (newState == SlidingUpPanelLayout.PanelState.COLLAPSED) {
             mStatus = Status.COLLAPSED;
-            if (mBinding.songProgressNormal.getVisibility() != View.VISIBLE) {
-                mBinding.songProgressNormal.setVisibility(View.VISIBLE);
-            }
-            if (mBinding.mode.getVisibility() != View.GONE) {
-                mBinding.mode.setVisibility(View.GONE);
-            }
-            if (mBinding.previous.getVisibility() != View.GONE) {
-                mBinding.previous.setVisibility(View.GONE);
-            }
+            mStates.songProgressNormalVisibility.set(true);
+            mStates.modeVisibility.set(false);
+            mStates.previousVisibility.set(false);
             mBinding.topContainer.setOnClickListener(v -> {
-                if (mSlidingUpPanelLayout.isTouchEnabled()) {
+                if (mSlidingUpPanelLayout.isTouchEnabled())
                     mSlidingUpPanelLayout.setPanelState(SlidingUpPanelLayout.PanelState.EXPANDED);
-                }
             });
         } else if (newState == SlidingUpPanelLayout.PanelState.DRAGGING) {
-            if (mBinding.customToolbar.getVisibility() != View.INVISIBLE) {
-                mBinding.customToolbar.setVisibility(View.INVISIBLE);
-            }
+            mStates.customToolbarVisibility.set(false);
         }
-
     }
 
-    private void calculateTitleAndArtist() {
-        Rect titleBounds = new Rect();
-        mBinding.title.getPaint().getTextBounds(mBinding.title.getText().toString(), 0,
-                mBinding.title.getText().length(), titleBounds);
-        int titleWidth = titleBounds.width();
+    public void calculateTitleAndArtist() {
+        int titleWidth = getTextWidth(mBinding.title != null ? mBinding.title : null);
+        int artistWidth = getTextWidth(mBinding.artist != null ? mBinding.artist : null);
+        mTitleEndTranslationX = (SCREEN_WIDTH / 2) - (titleWidth / 2) - DisplayUtils.dp2px(67);
+        mArtistEndTranslationX = (SCREEN_WIDTH / 2) - (artistWidth / 2) - DisplayUtils.dp2px(67);
+        mArtistNormalEndTranslationY = DisplayUtils.dp2px(12);
+        mContentNormalEndTranslationY = SCREEN_WIDTH + DisplayUtils.dp2px(32);
+        mStates.titleTranslationX.set(mStatus == Status.COLLAPSED ? 0f : mTitleEndTranslationX);
+        mStates.artistTranslationX.set(mStatus == Status.COLLAPSED ? 0f : mArtistEndTranslationX);
+    }
 
+    private int getTextWidth(TextView textView) {
+        if (textView == null) return 0;
         Rect artistBounds = new Rect();
-        mBinding.artist.getPaint().getTextBounds(mBinding.artist.getText().toString(), 0,
-                mBinding.artist.getText().length(), artistBounds);
-        int artistWidth = artistBounds.width();
-
-        titleEndTranslationX = (screenWidth / 2) - (titleWidth / 2) - DisplayUtils.dp2px(67);
-
-        artistEndTranslationX = (screenWidth / 2) - (artistWidth / 2) - DisplayUtils.dp2px(67);
-        artistNormalEndTranslationY = DisplayUtils.dp2px(12);
-
-        contentNormalEndTranslationY = screenWidth + DisplayUtils.dp2px(32);
-
-        if (mStatus == Status.COLLAPSED) {
-            mBinding.title.setTranslationX(0);
-            mBinding.artist.setTranslationX(0);
-        } else {
-            mBinding.title.setTranslationX(titleEndTranslationX);
-            mBinding.artist.setTranslationX(artistEndTranslationX);
-        }
+        textView.getPaint().getTextBounds(textView.getText().toString(), 0, textView.getText().length(), artistBounds);
+        return artistBounds.width();
     }
 
-    private void calculateIcons() {
-        modeStartX = mBinding.mode.getLeft();
-        previousStartX = mBinding.previous.getLeft();
-        playPauseStartX = mBinding.playPause.getLeft();
-        nextStartX = mBinding.next.getLeft();
-        playQueueStartX = mBinding.icPlayList.getLeft();
-        int size = DisplayUtils.dp2px(36);
-        int gap = (screenWidth - 5 * (size)) / 6;
-        playPauseEndX = (screenWidth / 2) - (size / 2);
-        previousEndX = playPauseEndX - gap - size;
-        modeEndX = previousEndX - gap - size;
-        nextEndX = playPauseEndX + gap + size;
-        playQueueEndX = nextEndX + gap + size;
-        iconContainerStartY = mBinding.iconContainer.getTop();
-        iconContainerEndY = screenHeight - 3 * mBinding.iconContainer.getHeight() - mBinding.seekBottom.getHeight();
+    /**
+     * TODO tip：使用 ObservableField 绑定，尽可能减少 View 实例 Null 安全一致性问题
+     * <p>
+     *  如这么说无体会，详见 https://xiaozhuanlan.com/topic/9816742350 和 https://xiaozhuanlan.com/topic/2356748910
+     */
+    public static class SlideAnimatorStates extends StateHolder {
+        public final State<Float> titleTranslationX = new State<>(0f);
+        public final State<Float> artistTranslationX = new State<>(0f);
+        public final State<Float> artistTranslationY = new State<>(0f);
+        public final State<Float> summaryTranslationY = new State<>(0f);
+        public final State<Integer> playPauseX = new State<>(0);
+        public final State<Integer> playCircleAlpha = new State<>(0);
+        public final State<Integer> playPauseDrawableColor = new State<>(0);
+        public final State<Integer> previousX = new State<>(0);
+        public final State<Integer> modeX = new State<>(0);
+        public final State<Integer> nextX = new State<>(0);
+        public final State<Integer> icPlayListX = new State<>(0);
+        public final State<Float> modeAlpha = new State<>(0f);
+        public final State<Float> previousAlpha = new State<>(0f);
+        public final State<Integer> iconContainerY = new State<>(0);
+        public final State<Boolean> songProgressNormalVisibility = new State<>(false);
+        public final State<Boolean> modeVisibility = new State<>(false);
+        public final State<Boolean> previousVisibility = new State<>(false);
+        public final State<Boolean> customToolbarVisibility = new State<>(false);
+        public final State<Pair<Integer, Integer>> albumArtSize = new State<>(new Pair<>(0, 0));
     }
-
-    private void toolbarSlideIn(Context context) {
-        mBinding.customToolbar.post(() -> {
-            Animation animation = AnimationUtils.loadAnimation(context, R.anim.toolbar_slide_in);
-            animation.setAnimationListener(new Animation.AnimationListener() {
-                @Override
-                public void onAnimationStart(Animation animation) {
-                    mBinding.customToolbar.setVisibility(View.VISIBLE);
-                }
-
-                @Override
-                public void onAnimationEnd(Animation animation) {
-
-                }
-
-                @Override
-                public void onAnimationRepeat(Animation animation) {
-
-                }
-            });
-            mBinding.customToolbar.startAnimation(animation);
-        });
-    }
-
 }

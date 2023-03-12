@@ -1,23 +1,22 @@
 buildscript {
     ext {
-        appTargetSdk = 29
+        appTargetSdk = 33
         appMinSdk = 23
-        appVersionCode = 30204
-        appVersionName = "3.2.4"
-        lifecycleVersion = "2.3.1"
-        navigationVersion = "2.3.5"
+        appVersionCode = 50500
+        appVersionName = "5.5.0"
     }
 
     repositories {
         google()
         gradlePluginPortal()
+        maven { url 'https://jitpack.io' }
 
         //默认使用 gradlePluginPortal，以便在依赖库有紧急更新时能第一时间获取
         //如对日常的拉取速度有追求，可考虑使用以下远程仓库（是对 central 的国内同步仓库，存在 1 天左右的时差）
         //maven { url "https://maven.aliyun.com/repository/public" }
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:4.2.1'
+        classpath 'com.android.tools.build:gradle:7.3.1'
     }
 }
 
@@ -25,6 +24,8 @@ allprojects {
     repositories {
         google()
         mavenCentral()
+        maven { url 'https://jitpack.io' }
+        //maven { url "https://maven.aliyun.com/repository/public" }
     }
 }
 

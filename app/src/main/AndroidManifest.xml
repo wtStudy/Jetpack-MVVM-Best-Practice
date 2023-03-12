@@ -20,7 +20,9 @@
         tools:ignore="AllowBackup,GoogleAppIndexingWarning,UnusedAttribute"
         tools:replace="android:name">
 
-        <activity android:name=".MainActivity">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
@@ -28,10 +30,11 @@
             </intent-filter>
         </activity>
 
-        <service android:name=".player.notification.PlayerService" />
+        <service android:name=".ui.widget.PlayerService" />
 
         <receiver
-            android:name=".player.notification.PlayerReceiver"
+            android:name=".domain.message.PlayerReceiver"
+            android:exported="false"
             tools:ignore="ExportedReceiver">
             <intent-filter>
                 <action android:name="pure_music.kunminx.close" />

@@ -16,6 +16,7 @@
 
 package com.kunminx.puremusic.data.repository;
 
+import android.annotation.SuppressLint;
 import android.util.Log;
 
 import com.google.gson.Gson;
@@ -27,7 +28,7 @@ import com.kunminx.architecture.utils.Utils;
 import com.kunminx.puremusic.R;
 import com.kunminx.puremusic.data.api.APIs;
 import com.kunminx.puremusic.data.api.AccountService;
-import com.kunminx.puremusic.data.bean.DownloadFile;
+import com.kunminx.puremusic.data.bean.DownloadState;
 import com.kunminx.puremusic.data.bean.LibraryInfo;
 import com.kunminx.puremusic.data.bean.TestAlbum;
 import com.kunminx.puremusic.data.bean.User;
@@ -36,10 +37,11 @@ import org.jetbrains.annotations.NotNull;
 
 import java.lang.reflect.Type;
 import java.util.List;
-import java.util.Timer;
-import java.util.TimerTask;
 import java.util.concurrent.TimeUnit;
 
+import io.reactivex.Observable;
+import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.schedulers.Schedulers;
 import okhttp3.OkHttpClient;
 import okhttp3.logging.HttpLoggingInterceptor;
 import retrofit2.Call;
@@ -68,16 +70,16 @@ public class DataRepository {
         HttpLoggingInterceptor logging = new HttpLoggingInterceptor();
         logging.setLevel(HttpLoggingInterceptor.Level.BODY);
         OkHttpClient client = new OkHttpClient.Builder()
-                .connectTimeout(8, TimeUnit.SECONDS)
-                .readTimeout(8, TimeUnit.SECONDS)
-                .writeTimeout(8, TimeUnit.SECONDS)
-                .addInterceptor(logging)
-                .build();
+            .connectTimeout(8, TimeUnit.SECONDS)
+            .readTimeout(8, TimeUnit.SECONDS)
+            .writeTimeout(8, TimeUnit.SECONDS)
+            .addInterceptor(logging)
+            .build();
         retrofit = new Retrofit.Builder()
-                .baseUrl(APIs.BASE_URL)
-                .client(client)
-                .addConverterFactory(GsonConverterFactory.create())
-                .build();
+            .baseUrl(APIs.BASE_URL)
+            .client(client)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build();
     }
 
     /**
@@ -89,15 +91,13 @@ public class DataRepository {
      * 如果这样说还不理解的话，详见《如何让同事爱上架构模式、少写 bug 多注释》篇的解析
      * https://xiaozhuanlan.com/topic/8204519736
      *
-     * @param result
+     * @param result result
      */
     public void getFreeMusic(DataResult.Result<TestAlbum> result) {
-
         Gson gson = new Gson();
         Type type = new TypeToken<TestAlbum>() {
         }.getType();
         TestAlbum testAlbum = gson.fromJson(Utils.getApp().getString(R.string.free_music_json), type);
-
         result.onResult(new DataResult<>(testAlbum, new ResponseStatus()));
     }
 
@@ -106,7 +106,6 @@ public class DataRepository {
         Type type = new TypeToken<List<LibraryInfo>>() {
         }.getType();
         List<LibraryInfo> list = gson.fromJson(Utils.getApp().getString(R.string.library_json), type);
-
         result.onResult(new DataResult<>(list, new ResponseStatus()));
     }
 
@@ -117,32 +116,28 @@ public class DataRepository {
      *
      * @param result 从 Request-ViewModel 或 UseCase 注入 LiveData，用于 控制流程、回传进度、回传文件
      */
-    public void downloadFile(DownloadFile downloadFile, DataResult.Result<DownloadFile> result) {
-
-        Timer timer = new Timer();
-
-        TimerTask task = new TimerTask() {
-            @Override
-            public void run() {
-
-                //模拟下载，假设下载一个文件要 10秒、每 100 毫秒下载 1% 并通知 UI 层
-                if (downloadFile.getProgress() < 100) {
-                    downloadFile.setProgress(downloadFile.getProgress() + 1);
-                    Log.d("TAG", "下载进度 " + downloadFile.getProgress() + "%");
-                } else {
-                    timer.cancel();
-                }
-                if (downloadFile.isForgive()) {
-                    timer.cancel();
-                    downloadFile.setProgress(0);
-                    downloadFile.setForgive(false);
+    @SuppressLint("CheckResult")
+    public void downloadFile(DataResult.Result<DownloadState> result) {
+        final DownloadState[] originState = {new DownloadState()};
+        Observable.interval(100, TimeUnit.MILLISECONDS)
+            .subscribeOn(Schedulers.io())
+            .observeOn(AndroidSchedulers.mainThread())
+            .subscribe(aLong -> {
+                DownloadState newState = new DownloadState();
+                if (originState[0].isForgive || originState[0].progress == 100) {
                     return;
                 }
-                result.onResult(new DataResult<>(downloadFile, new ResponseStatus()));
-            }
-        };
 
-        timer.schedule(task, 100, 100);
+                //模拟下载，假设下载一个文件要 10秒、每 100 毫秒下载 1% 并通知 UI 层
+                if (originState[0].progress < 100) {
+                    newState = new DownloadState(false, originState[0].progress + 1, null);
+                    originState[0] = newState;
+                    Log.d("---", "下载进度 " + originState[0].progress + "%");
+                }
+
+                result.onResult(new DataResult<>(newState, new ResponseStatus()));
+                Log.d("---", "回推状态");
+            });
     }
 
     //TODO tip：模拟可取消的登录请求：
@@ -165,7 +160,7 @@ public class DataRepository {
             @Override
             public void onResponse(@NotNull Call<String> call, @NotNull Response<String> response) {
                 ResponseStatus responseStatus = new ResponseStatus(
-                        String.valueOf(response.code()), response.isSuccessful(), ResultSource.NETWORK);
+                    String.valueOf(response.code()), response.isSuccessful(), ResultSource.NETWORK);
                 result.onResult(new DataResult<>(response.body(), responseStatus));
                 mUserCall = null;
             }
@@ -173,7 +168,7 @@ public class DataRepository {
             @Override
             public void onFailure(@NotNull Call<String> call, @NotNull Throwable t) {
                 result.onResult(new DataResult<>(null,
-                        new ResponseStatus(t.getMessage(), false, ResultSource.NETWORK)));
+                    new ResponseStatus(t.getMessage(), false, ResultSource.NETWORK)));
                 mUserCall = null;
             }
         });

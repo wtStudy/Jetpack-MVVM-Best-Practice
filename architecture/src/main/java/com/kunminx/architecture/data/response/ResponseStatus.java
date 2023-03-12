@@ -18,14 +18,14 @@ package com.kunminx.architecture.data.response;
 
 /**
  * TODO：本类仅用作示例参考，请根据 "实际项目需求" 配置自定义的 "响应状态元信息"
- *
+ * <p>
  * Create by KunMinX at 19/10/11
  */
 public class ResponseStatus {
 
     private String responseCode = "";
     private boolean success = true;
-    private Enum source = ResultSource.NETWORK;
+    private Enum<ResultSource> source = ResultSource.NETWORK;
 
     public ResponseStatus() {
     }
@@ -35,7 +35,7 @@ public class ResponseStatus {
         this.success = success;
     }
 
-    public ResponseStatus(String responseCode, boolean success, Enum source) {
+    public ResponseStatus(String responseCode, boolean success, Enum<ResultSource> source) {
         this(responseCode, success);
         this.source = source;
     }
@@ -48,7 +48,7 @@ public class ResponseStatus {
         return success;
     }
 
-    public Enum getSource() {
+    public Enum<ResultSource> getSource() {
         return source;
     }
 }
